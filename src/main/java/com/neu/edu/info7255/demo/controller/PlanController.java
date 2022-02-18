@@ -17,7 +17,6 @@ import java.util.*;
 public class PlanController {
 
     Jedis jedis = new Jedis();
-    // etag value -> plan id
     Map<String, String> eTags = new HashMap<>();
 
     @PostMapping("/addPlan")
@@ -32,7 +31,6 @@ public class PlanController {
         }
 
         String etag = headers.getETag();
-        System.out.println(etag);
         if (eTags.containsKey(etag)) {
             return new ResponseEntity("This plan is in the store", HttpStatus.NOT_MODIFIED);
         } else {
@@ -48,13 +46,15 @@ public class PlanController {
     @GetMapping("/getPlan/{id}")
     public ResponseEntity getPlan(@PathVariable(required = true) String id, @RequestHeader HttpHeaders headers) {
 
+        if (jedis.get(id) == null) {
+            return new ResponseEntity("Not found", HttpStatus.NOT_FOUND);
+        }
         List<String> list = headers.getIfNoneMatch();
         System.out.println(list.size());
         if (!list.isEmpty()) {
             String requestETag = list.get(0);
 
             if (eTags.containsKey(requestETag)) {
-                System.out.println("Not modified");
                 return new ResponseEntity("This plan is not modified", HttpStatus.NOT_MODIFIED);
             } else {
                 eTags.put(requestETag, id);
