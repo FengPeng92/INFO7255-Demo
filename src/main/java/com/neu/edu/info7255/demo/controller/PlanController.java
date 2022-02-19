@@ -8,8 +8,15 @@ import org.json.JSONTokener;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 import redis.clients.jedis.Jedis;
+
+import javax.servlet.annotation.HttpConstraint;
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 import java.util.*;
 
@@ -19,8 +26,11 @@ public class PlanController {
     Jedis jedis = new Jedis();
     Map<String, String> eTags = new HashMap<>();
 
+
+
     @PostMapping("/addPlan")
-    public ResponseEntity addPlan(@RequestBody(required = false) String planString,  @RequestHeader HttpHeaders headers) {
+    public ResponseEntity addPlan(@RequestBody(required = false) String planString) {
+        HttpHeaders headers = new HttpHeaders();
         JSONObject planJson = new JSONObject(planString);
         JSONObject jsonSchema = new JSONObject(new JSONTokener(PlanController.class.getResourceAsStream("/schema.json")));
         Schema schema = SchemaLoader.load(jsonSchema);
@@ -30,16 +40,26 @@ public class PlanController {
             return new ResponseEntity("Invalid data", HttpStatus.BAD_REQUEST);
         }
 
-        String etag = headers.getETag();
-        if (eTags.containsKey(etag)) {
-            return new ResponseEntity("This plan is in the store", HttpStatus.NOT_MODIFIED);
-        } else {
-            eTags.put(etag, planString);
-            jedis.set(planJson.getString("objectId"), planString);
-            JSONObject responseBody = new JSONObject();
-            responseBody.put("objectId", planJson.getString("objectId"));
-            return new ResponseEntity(responseBody.toMap(), headers, HttpStatus.CREATED);
+
+        InputStream planStream = new ByteArrayInputStream(planString.getBytes());
+        try {
+            String etag = generateETagHeaderValue(planStream, false);;
+            if (eTags.containsKey(etag)) {
+                return new ResponseEntity("This plan is in the store", HttpStatus.NOT_MODIFIED);
+            } else {
+                jedis.set(planJson.getString("objectId"), planString);
+                JSONObject responseBody = new JSONObject();
+                responseBody.put("objectId", planJson.getString("objectId"));
+                headers.setETag(etag);
+                System.out.println();
+                return new ResponseEntity(responseBody.toMap(), headers, HttpStatus.OK);
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+        return new ResponseEntity("Invalid data", headers, HttpStatus.BAD_REQUEST);
+
     }
 
 
@@ -50,7 +70,6 @@ public class PlanController {
             return new ResponseEntity("Not found", HttpStatus.NOT_FOUND);
         }
         List<String> list = headers.getIfNoneMatch();
-        System.out.println(list.size());
         if (!list.isEmpty()) {
             String requestETag = list.get(0);
 
@@ -77,6 +96,18 @@ public class PlanController {
         jedis.del(id);
 
         return new ResponseEntity("Delete Successfully", HttpStatus.ACCEPTED);
+    }
+
+    public String generateETagHeaderValue(InputStream inputStream, boolean isWeak) throws IOException {
+        StringBuilder builder = new StringBuilder(37);
+        if (isWeak) {
+            builder.append("W/");
+        }
+
+        builder.append("\"0");
+        DigestUtils.appendMd5DigestAsHex(inputStream, builder);
+        builder.append('"');
+        return builder.toString();
     }
 
 }
