@@ -12,8 +12,6 @@ import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 import redis.clients.jedis.Jedis;
 
-import javax.servlet.annotation.HttpConstraint;
-import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,7 +26,7 @@ public class PlanController {
 
 
 
-    @PostMapping("/addPlan")
+    @PostMapping("/plan")
     public ResponseEntity addPlan(@RequestBody(required = false) String planString) {
         HttpHeaders headers = new HttpHeaders();
         JSONObject planJson = new JSONObject(planString);
@@ -63,7 +61,7 @@ public class PlanController {
     }
 
 
-    @GetMapping("/getPlan/{id}")
+    @GetMapping("/plan/{id}")
     public ResponseEntity getPlan(@PathVariable(required = true) String id, @RequestHeader HttpHeaders headers) {
 
         if (jedis.get(id) == null) {
@@ -85,14 +83,18 @@ public class PlanController {
 
     }
 
-    @DeleteMapping("/deletePlan/{id}")
+    @DeleteMapping("/plan/{id}")
     public ResponseEntity deletePlan(@PathVariable(required = true) String id) {
 
+        boolean isFound = false;
         for (String key : eTags.keySet()) {
             if (eTags.get(key).equals(id)) {
                 eTags.remove(key);
+                isFound = true;
             }
         }
+
+        if (!isFound) return new ResponseEntity("Not Found", HttpStatus.NOT_FOUND);
         jedis.del(id);
 
         return new ResponseEntity("Delete Successfully", HttpStatus.ACCEPTED);
