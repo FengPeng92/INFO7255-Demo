@@ -18,7 +18,7 @@ public class TokenController {
     public ResponseEntity<String> generateToken() {
         String token = jwtTokenUtil.generateToken();
         System.out.println("token: " + token);
-        return new ResponseEntity<String>(token, HttpStatus.CREATED);
+        return new ResponseEntity(token, HttpStatus.CREATED);
     }
 
     @PostMapping("/validateToken")

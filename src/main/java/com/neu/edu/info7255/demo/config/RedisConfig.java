@@ -1,6 +1,7 @@
 package com.neu.edu.info7255.demo.config;
 
 
+import com.neu.edu.info7255.demo.beans.JedisBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
@@ -23,6 +24,11 @@ public class RedisConfig {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(jedisConnectionFactory());
         return template;
+    }
+
+    @Bean("jedisBean")
+    public JedisBean jedisBean() {
+        return new JedisBean() ;
     }
 
 }
