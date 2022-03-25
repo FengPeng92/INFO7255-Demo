@@ -13,7 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
-import redis.clients.jedis.Jedis;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -23,9 +22,6 @@ import java.util.*;
 
 @RestController
 public class PlanController {
-
-    Jedis jedis = new Jedis();
-    // key: eTag, value: objectId
     Map<String, String> eTags = new HashMap<>();
 
     @Autowired
@@ -33,8 +29,6 @@ public class PlanController {
 
     @Autowired
     private JedisBean jedisBean;
-
-
 
     @PostMapping("/plan")
     public ResponseEntity addPlan(@RequestBody(required = false) String planString, @RequestHeader HttpHeaders requestHeader) {
@@ -52,7 +46,7 @@ public class PlanController {
                 return new ResponseEntity("This plan is in the store", HttpStatus.NOT_MODIFIED);
             } else {
                 //jedis.set(planJson.getString("objectId"), planString);
-                jedisBean.add(planJson);
+                jedisBean.add(planJson, planJson.getString("objectType") + ":" + planJson.getString("objectId"));
                 JSONObject responseBody = new JSONObject();
                 responseBody.put("objectId", planJson.getString("objectId"));
                 headers.setETag(etag);
@@ -71,11 +65,8 @@ public class PlanController {
     @GetMapping("/plan/{id}")
     public ResponseEntity getPlan(@PathVariable(required = true) String id, @RequestHeader HttpHeaders headers) {
 
-        String planString = jedisBean.getFromDB(id);
-        if (planString == null || planString.equals("{}")) return new ResponseEntity("Not found", HttpStatus.NOT_FOUND);
-//        if (jedis.get(id) == null) {
-//            return new ResponseEntity("Not found", HttpStatus.NOT_FOUND);
-//        }
+        JSONObject planObj = jedisBean.get("plan:" + id);
+        if (planObj == null) return new ResponseEntity("Not found", HttpStatus.NOT_FOUND);
         List<String> list = headers.getIfNoneMatch();
         if (!list.isEmpty()) {
             String requestETag = list.get(0);
@@ -84,10 +75,10 @@ public class PlanController {
                 return new ResponseEntity("This plan is not modified", HttpStatus.NOT_MODIFIED);
             } else {
                 eTags.put(requestETag, id);
-                return new ResponseEntity(planString, HttpStatus.ACCEPTED);
+                return new ResponseEntity(planObj.toString(), HttpStatus.ACCEPTED);
             }
         } else {
-            return new ResponseEntity(planString, HttpStatus.ACCEPTED);
+            return new ResponseEntity(planObj.toString(), HttpStatus.ACCEPTED);
         }
 
     }
@@ -103,7 +94,6 @@ public class PlanController {
             }
         }
 
-        //jedis.del(id);
         jedisBean.delete(id);
         if (!isFound) return new ResponseEntity("Not Found", HttpStatus.NOT_FOUND);
 
@@ -165,7 +155,6 @@ public class PlanController {
             schema.validate(planJson);
         } catch (ValidationException e) {
             return false;
-            //return new ResponseEntity("Invalid data", HttpStatus.BAD_REQUEST);
         }
         return true;
     }
