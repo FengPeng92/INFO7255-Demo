@@ -94,7 +94,7 @@ public class PlanController {
             }
         }
 
-        jedisBean.delete(id);
+        jedisBean.delete("plan:" + id);
         if (!isFound) return new ResponseEntity("Not Found", HttpStatus.NOT_FOUND);
 
 

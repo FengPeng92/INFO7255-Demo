@@ -1,7 +1,6 @@
 package com.neu.edu.info7255.demo.beans;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -12,76 +11,65 @@ import redis.clients.jedis.Jedis;
 
 public class JedisBean {
 
-    private static final String SEP = ":";
-
     Jedis jedis = new Jedis();
-
 
     public JSONObject get(String id) {
 
-        JSONObject jsonObj = new JSONObject();
-        Set<String> keys = jedis.keys(id + SEP + "*");
+        JSONObject planObj = new JSONObject();
+        Set<String> keys = jedis.keys(id + ":" + "*");
 
         for(String key : keys) {
-            Set<String> jsonSet = jedis.smembers(key);
+            Set<String> set = jedis.smembers(key);
 
-            if(jsonSet.size() > 1) {
+            if(set.size() > 1) {
                 JSONArray jsonArr = new JSONArray();
-                Iterator<String> jsonKeySetIterator = jsonSet.iterator();
-                while(jsonKeySetIterator.hasNext()) {
-                    jsonArr.put(get(jsonKeySetIterator.next()));
-                }
-                jsonObj.put(key.substring(key.lastIndexOf(SEP) + 1), jsonArr);
+                // call get recursively
+                for (String next : set) jsonArr.put(get(next));
+                planObj.put(key.substring(key.lastIndexOf(":") + 1), jsonArr);
             } else {
-                Iterator<String> jsonKeySetIterator = jsonSet.iterator();
-                JSONObject embdObject = null;
-                while(jsonKeySetIterator.hasNext()) {
-                    embdObject = get(jsonKeySetIterator.next());
-                }
-                jsonObj.put(key.substring(key.lastIndexOf(SEP) + 1), embdObject);
+                JSONObject jsonObj = null;
+                for (String next : set) jsonObj = get(next);
+                planObj.put(key.substring(key.lastIndexOf(":") + 1), jsonObj);
             }
 
         }
 
         Map<String,String> simpleMap = jedis.hgetAll(id);
         for(String simpleKey : simpleMap.keySet()) {
-            jsonObj.put(simpleKey, simpleMap.get(simpleKey));
+            planObj.put(simpleKey, simpleMap.get(simpleKey));
         }
 
-
-        return jsonObj;
+        return planObj;
     }
 
     public boolean add(JSONObject jsonObject, String prefix) {
 
         Map<String, String> map = new HashMap<>();
         for(Object key : jsonObject.keySet()) {
-            String attributeKey = String.valueOf(key);
-            Object attributeVal = jsonObject.get(String.valueOf(key));
-            String edge = attributeKey;
-            if(attributeVal instanceof JSONObject) {
+            String keyStr = String.valueOf(key);
+            Object value = jsonObject.get(keyStr);
+            String nextKey = prefix + ":" + keyStr;
+            if(value instanceof JSONObject) {
 
-                JSONObject embdObject = (JSONObject) attributeVal;
-                String setKey = prefix + SEP + edge;
-                String embd_uuid = embdObject.get("objectType") + SEP + embdObject.getString("objectId");
-                jedis.sadd(setKey, embd_uuid);
-                add(embdObject, embd_uuid);
+                JSONObject nextJsonObj = (JSONObject) value;
+                String nextPrefix = nextJsonObj.getString("objectType") + ":" + nextJsonObj.getString("objectId");
+                jedis.sadd(nextKey, nextPrefix);
+                add(nextJsonObj, nextPrefix);
 
-            } else if (attributeVal instanceof JSONArray) {
 
-                JSONArray jsonArray = (JSONArray) attributeVal;
-                Iterator<Object> jsonIterator = jsonArray.iterator();
-                String setKey = prefix + SEP + edge;
+            } else if (value instanceof JSONArray) {
 
-                while(jsonIterator.hasNext()) {
-                    JSONObject embdObject = (JSONObject) jsonIterator.next();
-                    String embd_uuid = embdObject.get("objectType") + SEP + embdObject.getString("objectId");
-                    jedis.sadd(setKey, embd_uuid);
-                    add(embdObject, embd_uuid);
+                JSONArray jsonArray = (JSONArray) value;
+
+                for (Object nextObj : jsonArray) {
+                    JSONObject nextJsonObj = (JSONObject) nextObj;
+                    String nextPrefix = nextJsonObj.getString("objectType") + ":" + nextJsonObj.getString("objectId");
+                    jedis.sadd(nextKey, nextPrefix);
+                    add(nextJsonObj, nextPrefix);
                 }
 
             } else {
-                map.put(attributeKey, String.valueOf(attributeVal));
+                map.put(keyStr, String.valueOf(value));
             }
         }
         jedis.hmset(prefix, map);
@@ -90,66 +78,55 @@ public class JedisBean {
 
     // delete plan
     public boolean delete(String objectId) {
-        return deleteHelper("plan" + SEP + objectId);
-    }
-
-    public boolean deleteHelper(String uuid) {
-        // recursively deleting all embedded json objects
-        Set<String> keys = jedis.keys(uuid + SEP + "*");
+        Set<String> keys = jedis.keys(objectId + ":" + "*");
         for(String key : keys) {
-            Set<String> jsonKeySet = jedis.smembers(key);
-            for(String embd_uuid : jsonKeySet) {
-                deleteHelper(embd_uuid);
+            Set<String> set = jedis.smembers(key);
+            for(String nextObjId : set) {
+                delete(nextObjId);
             }
             jedis.del(key);
         }
 
-        // deleting simple fields
-        jedis.del(uuid);
-        jedis.close();
+        jedis.del(objectId);
         return true;
     }
 
 
     public boolean update(JSONObject jsonObject) {
-        String uuid = jsonObject.getString("objectType") + SEP + jsonObject.getString("objectId");
+        String prefix = jsonObject.getString("objectType") + ":" + jsonObject.getString("objectId");
 
-        Map<String,String> simpleMap = jedis.hgetAll(uuid);
-        if(simpleMap.isEmpty()) {
-            simpleMap = new HashMap<String,String>();
-        }
+        Map<String,String> map = jedis.hgetAll(prefix);
+        if(map.isEmpty()) map = new HashMap<>();
 
         for(Object key : jsonObject.keySet()) {
-            String attributeKey = String.valueOf(key);
-            Object attributeVal = jsonObject.get(String.valueOf(key));
-            String edge = attributeKey;
 
-            if(attributeVal instanceof JSONObject) {
+            String keyStr = String.valueOf(key);
+            Object value = jsonObject.get(keyStr);
+            String nextKey = prefix + ":" + keyStr;
 
-                JSONObject embdObject = (JSONObject) attributeVal;
-                String setKey = uuid + SEP + edge;
-                String embd_uuid = embdObject.get("objectType") + SEP + embdObject.getString("objectId");
-                jedis.sadd(setKey, embd_uuid);
-                update(embdObject);
+            if(value instanceof JSONObject) {
 
-            } else if (attributeVal instanceof JSONArray) {
+                JSONObject nextJsonObj = (JSONObject) value;
+                String nextPrefix = nextJsonObj.getString("objectType") + ":" + nextJsonObj.getString("objectId");
+                jedis.sadd(nextKey, nextPrefix);
+                update(nextJsonObj);
 
-                JSONArray jsonArray = (JSONArray) attributeVal;
-                Iterator<Object> jsonIterator = jsonArray.iterator();
-                String setKey = uuid + SEP + edge;
+            } else if (value instanceof JSONArray) {
 
-                while(jsonIterator.hasNext()) {
-                    JSONObject embdObject = (JSONObject) jsonIterator.next();
-                    String embd_uuid = embdObject.get("objectType") + SEP + embdObject.getString("objectId");
-                    jedis.sadd(setKey, embd_uuid);
-                    update(embdObject);
+                JSONArray jsonArray = (JSONArray) value;
+
+                for (Object nextObj : jsonArray) {
+                    JSONObject nextJsonObj = (JSONObject) nextObj;
+                    String nextPrefix = nextJsonObj.getString("objectType") + ":" + nextJsonObj.getString("objectId");
+                    jedis.sadd(nextKey, nextPrefix);
+                    update(nextJsonObj);
                 }
 
             } else {
-                simpleMap.put(attributeKey, String.valueOf(attributeVal));
+                map.put(keyStr, String.valueOf(value));
             }
         }
-        jedis.hmset(uuid, simpleMap);
+        jedis.hmset(prefix, map);
         return true;
     }
 
