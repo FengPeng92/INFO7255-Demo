@@ -1,6 +1,7 @@
 package com.neu.edu.info7255.demo.controller;
 
 import com.neu.edu.info7255.demo.util.JwtTokenUtil;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -17,8 +18,9 @@ public class TokenController {
     @GetMapping("/generateToken")
     public ResponseEntity<String> generateToken() {
         String token = jwtTokenUtil.generateToken();
-        System.out.println("token: " + token);
-        return new ResponseEntity(token, HttpStatus.CREATED);
+        JSONObject result = new JSONObject();
+        result.put("token", token);
+        return new ResponseEntity(result.toString(), HttpStatus.CREATED);
     }
 
     @PostMapping("/validateToken")
