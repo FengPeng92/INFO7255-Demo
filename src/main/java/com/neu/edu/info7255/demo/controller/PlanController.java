@@ -64,7 +64,7 @@ public class PlanController {
 
     @GetMapping("/plan/{id}")
     public ResponseEntity getPlan(@PathVariable(required = true) String id, @RequestHeader HttpHeaders headers) {
-
+        if (!isAuthorized(headers)) return new ResponseEntity("Unauthorized Token", HttpStatus.BAD_REQUEST);
         JSONObject planObj = jedisBean.get("plan:" + id);
         if (planObj == null) return new ResponseEntity("Not found", HttpStatus.NOT_FOUND);
         List<String> list = headers.getIfNoneMatch();
@@ -84,8 +84,8 @@ public class PlanController {
     }
 
     @DeleteMapping("/plan/{id}")
-    public ResponseEntity deletePlan(@PathVariable(required = true) String id) {
-
+    public ResponseEntity deletePlan(@PathVariable(required = true) String id, @RequestHeader HttpHeaders headers) {
+        if (!isAuthorized(headers)) return new ResponseEntity("Unauthorized Token", HttpStatus.BAD_REQUEST);
         boolean isFound = false;
         for (String key : eTags.keySet()) {
             if (eTags.get(key).equals(id)) {
