@@ -1,7 +1,9 @@
 package com.neu.edu.info7255.demo.controller;
 
 import com.neu.edu.info7255.demo.beans.JedisBean;
+import com.neu.edu.info7255.demo.util.ElasticSearchUtil;
 import com.neu.edu.info7255.demo.util.JwtTokenUtil;
+import com.neu.edu.info7255.demo.util.MessageQueueUtil;
 import org.everit.json.schema.Schema;
 import org.everit.json.schema.ValidationException;
 import org.everit.json.schema.loader.SchemaLoader;
@@ -30,6 +32,12 @@ public class PlanController {
     @Autowired
     private JedisBean jedisBean;
 
+    @Autowired
+    private MessageQueueUtil messageQueueUtil;
+
+    @Autowired
+    private ElasticSearchUtil elasticSearchUtil;
+
     @PostMapping("/plan")
     public ResponseEntity addPlan(@RequestBody(required = false) String planString, @RequestHeader HttpHeaders requestHeader) {
 
@@ -45,8 +53,10 @@ public class PlanController {
             if (eTags.containsKey(etag)) {
                 return new ResponseEntity("This plan is in the store", HttpStatus.NOT_MODIFIED);
             } else {
-                //jedis.set(planJson.getString("objectId"), planString);
                 jedisBean.add(planJson, planJson.getString("objectType") + ":" + planJson.getString("objectId"));
+                //enqueue message
+                messageQueueUtil.indexQueue(planJson, planJson.getString("objectId"));
+                elasticSearchUtil.postDocument();
                 JSONObject responseBody = new JSONObject();
                 responseBody.put("objectId", planJson.getString("objectId"));
                 headers.setETag(etag);
@@ -93,8 +103,13 @@ public class PlanController {
                 isFound = true;
             }
         }
-
-        jedisBean.delete("plan:" + id);
+        
+        try {
+            jedisBean.delete("plan:" + id);
+            elasticSearchUtil.deleteDocument();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         if (!isFound) return new ResponseEntity("Not Found", HttpStatus.NOT_FOUND);
 
 
@@ -124,6 +139,10 @@ public class PlanController {
 
             if (jedisBean.update(planJson)) {
                 headers.setETag(etag);
+                //enqueue message
+                messageQueueUtil.indexQueue(planJson, planJson.getString("objectId"));
+                elasticSearchUtil.postDocument();
+                //messageQueueUtil.indexQueue(planJson, planJson.getString("objectId"));
                 return new ResponseEntity("plan update successfully", headers, HttpStatus.OK);
             } else {
                 return new ResponseEntity("plan update failed", headers, HttpStatus.OK);

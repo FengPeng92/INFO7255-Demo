@@ -46,16 +46,18 @@ public class JedisBean {
 
         Map<String, String> map = new HashMap<>();
         for(Object key : jsonObject.keySet()) {
+
             String keyStr = String.valueOf(key);
             Object value = jsonObject.get(keyStr);
             String nextKey = prefix + ":" + keyStr;
             if(value instanceof JSONObject) {
 
+                System.out.println(keyStr);
+
                 JSONObject nextJsonObj = (JSONObject) value;
                 String nextPrefix = nextJsonObj.getString("objectType") + ":" + nextJsonObj.getString("objectId");
                 jedis.sadd(nextKey, nextPrefix);
                 add(nextJsonObj, nextPrefix);
-
 
             } else if (value instanceof JSONArray) {
 
@@ -88,6 +90,7 @@ public class JedisBean {
         }
 
         jedis.del(objectId);
+        jedis.del("messageQueue");
         return true;
     }
 
