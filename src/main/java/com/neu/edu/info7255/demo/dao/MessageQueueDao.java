@@ -7,10 +7,9 @@ import redis.clients.jedis.Jedis;
 @Repository
 public class MessageQueueDao {
 
-    // Add value to message queue
+    private static Jedis jedis = new Jedis();
+
     public void addToQueue(String queue, String value) {
-        try (Jedis jedis = new Jedis("localhost")) {
-            jedis.lpush(queue, value);
-        }
+        jedis.lpush(queue, value);
     }
 }

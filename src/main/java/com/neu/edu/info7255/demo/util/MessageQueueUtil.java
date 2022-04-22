@@ -1,7 +1,7 @@
 package com.neu.edu.info7255.demo.util;
 
 
-import com.neu.edu.info7255.demo.service.MessageQueueService;
+import com.neu.edu.info7255.demo.dao.MessageQueueDao;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,14 +9,14 @@ import org.springframework.stereotype.Service;
 import redis.clients.jedis.exceptions.JedisException;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 @Service
 public class MessageQueueUtil {
 
+
     @Autowired
-    private MessageQueueService messageQueueService;
+    private MessageQueueDao messageQueueDao;
 
     private Map<String, String[]> relationMap = new HashMap<>();
 
@@ -39,7 +39,7 @@ public class MessageQueueUtil {
                     joinObj.put("parent", objectId);
                     nextJsonObj.put("plan_join", joinObj);
                     nextJsonObj.put("parent_id", objectId);
-                    messageQueueService.addToMessageQueue(nextJsonObj.toString(), false);
+                    messageQueueDao.addToQueue("messageQueue", nextJsonObj.toString());
 
                 } else if (value instanceof JSONArray) {
 
@@ -61,17 +61,16 @@ public class MessageQueueUtil {
             JSONObject joinObj = new JSONObject();
             System.out.println("78: " + objectId);
 
-            JSONObject obj1 = new JSONObject(simpleMap);
-            obj1.put("plan_join", joinObj);
+            JSONObject currentObj = new JSONObject(simpleMap);
             if(!simpleMap.containsKey("planType")){
-
                 joinObj.put("name", relationMap.get(objectId)[1]);
                 joinObj.put("parent", relationMap.get(objectId)[0]);
-                obj1.put("parent_id", relationMap.get(objectId)[0]);
+                currentObj.put("parent_id", relationMap.get(objectId)[0]);
             } else {
                 joinObj.put("name", "plan");
             }
-            messageQueueService.addToMessageQueue(obj1.toString(), false);
+            currentObj.put("plan_join", joinObj);
+            messageQueueDao.addToQueue("messageQueue", currentObj.toString());
         }
         catch(JedisException e) {
             e.printStackTrace();

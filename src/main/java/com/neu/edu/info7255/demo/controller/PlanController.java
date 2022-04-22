@@ -139,10 +139,8 @@ public class PlanController {
 
             if (jedisBean.update(planJson)) {
                 headers.setETag(etag);
-                //enqueue message
                 messageQueueUtil.indexQueue(planJson, planJson.getString("objectId"));
                 elasticSearchUtil.postDocument();
-                //messageQueueUtil.indexQueue(planJson, planJson.getString("objectId"));
                 return new ResponseEntity("plan update successfully", headers, HttpStatus.OK);
             } else {
                 return new ResponseEntity("plan update failed", headers, HttpStatus.OK);
