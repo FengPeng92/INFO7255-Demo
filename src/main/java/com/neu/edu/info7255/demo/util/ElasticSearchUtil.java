@@ -55,7 +55,6 @@ public class ElasticSearchUtil {
         if (message == null) return;
 
         JSONObject plan = new JSONObject(message);
-        //JSONObject plan= new JSONObject(result.get("message").toString());
         IndexRequest request = new IndexRequest(IndexName);
         request.source(plan.toString(), XContentType.JSON);
         request.id(plan.get("objectId").toString());
@@ -64,38 +63,13 @@ public class ElasticSearchUtil {
 
         }
         IndexResponse indexResponse = restHighLevelClient.index(request, RequestOptions.DEFAULT);
-        System.out.println("response id: "+indexResponse.getId());
         postDocument();
     }
 
     public void deleteDocument() throws IOException {
-
         DeleteIndexRequest request = new DeleteIndexRequest(IndexName);
-
         restHighLevelClient.indices().delete(request, RequestOptions.DEFAULT);
-
-
     }
-
-//    private static String getMapping() {
-//        String mapping = "{\r\n" +
-//                "    \"properties\": {\r\n" +
-//                "      \"objectId\": {\r\n" +
-//                "        \"type\": \"keyword\"\r\n" +
-//                "      },\r\n" +
-//                "      \"plan_join\":{\r\n" +
-//                "        \"type\": \"join\",\r\n" +
-//                "        \"relations\":{\r\n" +
-//                "          \"plan\": [\"planCostShares\", \"linkedPlanServices\"],\r\n" +
-//                "          \"linkedPlanServices\": [\"linkedService\", \"planserviceCostShares\"]\r\n" +
-//                "        }\r\n" +
-//                "      }\r\n" +
-//                "    }\r\n" +
-//                "  }\r\n" +
-//                "}";
-//
-//        return mapping;
-//    }
 
     private static String getMapping() {
         String mapping= "{\r\n" +
