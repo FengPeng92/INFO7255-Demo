@@ -3,7 +3,7 @@ package com.neu.edu.info7255.demo.controller;
 import com.neu.edu.info7255.demo.beans.JedisBean;
 import com.neu.edu.info7255.demo.util.ElasticSearchUtil;
 import com.neu.edu.info7255.demo.util.JwtTokenUtil;
-import com.neu.edu.info7255.demo.util.MessageQueueUtil;
+import com.neu.edu.info7255.demo.util.IndexQueueUtil;
 import org.everit.json.schema.Schema;
 import org.everit.json.schema.ValidationException;
 import org.everit.json.schema.loader.SchemaLoader;
@@ -33,7 +33,7 @@ public class PlanController {
     private JedisBean jedisBean;
 
     @Autowired
-    private MessageQueueUtil messageQueueUtil;
+    private IndexQueueUtil indexQueueUtil;
 
     @Autowired
     private ElasticSearchUtil elasticSearchUtil;
@@ -55,7 +55,7 @@ public class PlanController {
             } else {
                 jedisBean.add(planJson, planJson.getString("objectType") + ":" + planJson.getString("objectId"));
                 //enqueue message
-                messageQueueUtil.indexQueue(planJson, planJson.getString("objectId"));
+                indexQueueUtil.addToQueue(planJson, planJson.getString("objectId"));
                 elasticSearchUtil.postDocument();
                 JSONObject responseBody = new JSONObject();
                 responseBody.put("objectId", planJson.getString("objectId"));
@@ -139,7 +139,7 @@ public class PlanController {
 
             if (jedisBean.update(planJson)) {
                 headers.setETag(etag);
-                messageQueueUtil.indexQueue(planJson, planJson.getString("objectId"));
+                indexQueueUtil.addToQueue(planJson, planJson.getString("objectId"));
                 elasticSearchUtil.postDocument();
                 return new ResponseEntity("plan update successfully", headers, HttpStatus.OK);
             } else {

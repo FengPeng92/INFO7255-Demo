@@ -1,26 +1,24 @@
 package com.neu.edu.info7255.demo.util;
 
 
-import com.neu.edu.info7255.demo.dao.MessageQueueDao;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.exceptions.JedisException;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Service
-public class MessageQueueUtil {
+public class IndexQueueUtil {
 
-
-    @Autowired
-    private MessageQueueDao messageQueueDao;
+    private static Jedis jedis = new Jedis();
 
     private Map<String, String[]> relationMap = new HashMap<>();
 
-    public void indexQueue(JSONObject jsonObject, String objectId) {
+    public void addToQueue(JSONObject jsonObject, String objectId) {
         try {
 
             Map<String,String> simpleMap = new HashMap<>();
@@ -39,7 +37,7 @@ public class MessageQueueUtil {
                     joinObj.put("parent", objectId);
                     nextJsonObj.put("plan_join", joinObj);
                     nextJsonObj.put("parent_id", objectId);
-                    messageQueueDao.addToQueue("messageQueue", nextJsonObj.toString());
+                    jedis.lpush("indexQueue", nextJsonObj.toString());
 
                 } else if (value instanceof JSONArray) {
 
@@ -51,7 +49,7 @@ public class MessageQueueUtil {
 
                         String nextObjectId = nextJsonObj.getString("objectId");
                         relationMap.put(nextObjectId, new String[]{objectId, keyStr});
-                        indexQueue(nextJsonObj, nextObjectId);
+                        addToQueue(nextJsonObj, nextObjectId);
                     }
                 } else {
                     simpleMap.put(keyStr, String.valueOf(value));
@@ -70,7 +68,7 @@ public class MessageQueueUtil {
                 joinObj.put("name", "plan");
             }
             currentObj.put("plan_join", joinObj);
-            messageQueueDao.addToQueue("messageQueue", currentObj.toString());
+            jedis.lpush("indexQueue", currentObj.toString());
         }
         catch(JedisException e) {
             e.printStackTrace();

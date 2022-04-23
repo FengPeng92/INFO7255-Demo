@@ -39,7 +39,6 @@ public class ElasticSearchUtil {
         CreateIndexRequest request = new CreateIndexRequest(IndexName);
         request.settings(Settings.builder().put("index.number_of_shards", 1).put("index.number_of_replicas", 2));
         String mapping = getMapping();
-        System.out.println(mapping);
         request.mapping(mapping, XContentType.JSON);
 
         restHighLevelClient.indices().create(request, RequestOptions.DEFAULT);
@@ -51,7 +50,8 @@ public class ElasticSearchUtil {
             createIndex();
         }
 
-        String message = jedis.rpop("messageQueue");
+        String message = jedis.rpop("indexQueue");
+        System.out.println(message);
         if (message == null) return;
 
         JSONObject plan = new JSONObject(message);
@@ -62,7 +62,7 @@ public class ElasticSearchUtil {
             request.routing(plan.get("parent_id").toString());
 
         }
-        IndexResponse indexResponse = restHighLevelClient.index(request, RequestOptions.DEFAULT);
+        restHighLevelClient.index(request, RequestOptions.DEFAULT);
         postDocument();
     }
 
